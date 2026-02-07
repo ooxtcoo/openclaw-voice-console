@@ -24,37 +24,40 @@ def main() -> int:
     BIN_DIR.mkdir(parents=True, exist_ok=True)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-    whisper_exe = BIN_DIR / "main.exe"
-    if not whisper_exe.exists():
+    whisper_cli = BIN_DIR / "whisper-cli.exe"
+    if not whisper_cli.exists():
         try:
             data = download(WHISPER_CPP_ZIP_URL)
         except Exception as e:
             print("ERROR: failed to download whisper.cpp binaries:", e)
-            print("You can manually place whisper.cpp main.exe into:", BIN_DIR)
+            print("You can manually place whisper-cli.exe into:", BIN_DIR)
             return 2
 
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as z:
-                # Extract only main.exe (and optionally needed DLLs)
-                members = [m for m in z.namelist() if m.lower().endswith("main.exe") or m.lower().endswith(".dll")]
+                # Extract whisper-cli.exe (and needed DLLs)
+                members = [
+                    m for m in z.namelist()
+                    if m.lower().endswith("whisper-cli.exe") or m.lower().endswith(".dll")
+                ]
                 if not members:
-                    print("ERROR: zip did not contain main.exe")
+                    print("ERROR: zip did not contain whisper-cli.exe")
                     return 3
                 z.extractall(BIN_DIR, members)
         except Exception as e:
             print("ERROR: failed to unzip whisper.cpp:", e)
             return 4
 
-        # Some zips have nested folders. Find main.exe.
+        # Some zips have nested folders. Find whisper-cli.exe.
         found = None
-        for p in BIN_DIR.rglob("main.exe"):
+        for p in BIN_DIR.rglob("whisper-cli.exe"):
             found = p
             break
-        if found and found != whisper_exe:
-            whisper_exe.parent.mkdir(parents=True, exist_ok=True)
-            found.replace(whisper_exe)
-        if not whisper_exe.exists():
-            print("ERROR: main.exe not found after extraction")
+        if found and found != whisper_cli:
+            whisper_cli.parent.mkdir(parents=True, exist_ok=True)
+            found.replace(whisper_cli)
+        if not whisper_cli.exists():
+            print("ERROR: whisper-cli.exe not found after extraction")
             return 5
 
     model_path = MODEL_DIR / "ggml-small.bin"
@@ -68,7 +71,7 @@ def main() -> int:
         model_path.write_bytes(data)
 
     print("OK")
-    print("main.exe:", whisper_exe)
+    print("whisper-cli.exe:", whisper_cli)
     print("model:", model_path)
     return 0
 

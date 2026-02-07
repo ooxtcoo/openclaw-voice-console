@@ -93,11 +93,13 @@ Settings persist in browser `localStorage`.
 
 ## Local STT (whisper.cpp)
 
-GitHub blocks files > **100MB** in normal git pushes. So we do **not** store models/executables in this repo.
-
 ### Windows
 
-Recommended: download `whisper-cli` + a model from **GitHub Releases** (or build whisper.cpp yourself).
+On first run, `start_voice_console.ps1` will automatically download:
+- `whisper-cli.exe` (from the official whisper.cpp release zip)
+- the `ggml-small.bin` model
+
+So Windows users can do **clone → run** with no manual steps.
 
 ### Debian / Raspberry Pi OS (Linux)
 
