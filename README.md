@@ -1,30 +1,38 @@
-# OpenClaw Voice Console (Windows)
+# OpenClaw Voice Console (Windows + Linux)
 
 A local-first voice mode for OpenClaw:
 
 - **STT (local):** `whisper.cpp` (optional, offline)
 - **TTS (local):** Windows SAPI5 voices
 - **TTS (no API key):** Microsoft Edge Neural voices via `edge-tts`
-- **UI:** Sci‑fi console + wireframe face + particles + kiosk/fullscreen + live tuning sliders
+- **UI:** Sci-fi console + wireframe face + particles + kiosk/fullscreen + live tuning sliders
 
 > Status: V1 (works, still evolving)
 
 ## Requirements
 
-- Windows 10/11
+### Common
 - Node.js 18+ (recommended: 20+)
 - Python 3.10+ (recommended: 3.12)
-- OpenClaw gateway running locally
+- OpenClaw gateway running (local or reachable)
+- OpenClaw token: set `OPENCLAW_TOKEN` env var
 
-Optional (for local STT):
-- `whisper-cli.exe` from whisper.cpp + a model file
+### Windows
+- Windows 10/11
+
+### Debian / Raspberry Pi OS (Linux)
+- Debian-based Linux (including Raspberry Pi OS)
+
+Notes:
+- TTS on Linux uses **Edge Neural** via `edge-tts` (no API key).
+- Local STT needs `whisper-cli` + a model; see below.
 
 ## Install
 
 ### Windows
 
 ```powershell
-git clone <THIS_REPO_URL>
+git clone https://github.com/ooxtcoo/openclaw-voice-console.git
 cd openclaw-voice-console
 python -m pip install --upgrade edge-tts
 .\start_voice_console.ps1
@@ -36,7 +44,7 @@ Open:
 ### Debian / Raspberry Pi OS (Linux)
 
 ```bash
-git clone <THIS_REPO_URL>
+git clone https://github.com/ooxtcoo/openclaw-voice-console.git
 cd openclaw-voice-console
 
 # deps
@@ -73,7 +81,7 @@ Once they exist, the images below will render on GitHub:
 
 ### Talk
 - Tap/click **Tap to talk**
-- In fullscreen, press **Space** to toggle push‑to‑talk
+- In fullscreen, press **Space** to toggle push-to-talk
 
 ### Fullscreen / Kiosk
 - Button: **Vollbild**
@@ -91,29 +99,22 @@ Settings persist in browser `localStorage`.
 
 ## Local STT (whisper.cpp)
 
-This repo contains helper scripts, but it does **not** ship large binaries/models in normal commits.
+GitHub blocks files > **100MB** in normal git pushes. So we do **not** store models/executables in this repo.
 
-You need:
-- `bin/whisper-cli.exe`
-- `models/<ggml-model>.bin` (e.g. `ggml-small.bin`)
+### Windows
 
-### Linux note
+Recommended: download `whisper-cli` + a model from **GitHub Releases** (or build whisper.cpp yourself).
 
-For Linux you’ll want a **Linux** `whisper-cli` binary (not the Windows `.exe`).
-You can either build it from whisper.cpp or ship a separate linux binary (Release asset).
+### Debian / Raspberry Pi OS (Linux)
 
-### Recommended: download from GitHub Releases (includes exe + model)
+Provide a Linux `whisper-cli` binary and a model, then point the server at them:
 
-On the GitHub repo page:
-1) Go to **Releases** → **Create a new release**
-2) Upload a ZIP that contains:
-   - `bin/whisper-cli.exe`
-   - `models/ggml-small.bin`
-3) In the README/release notes, tell users to extract the ZIP into the repo root.
+```bash
+export WHISPER_CLI=/path/to/whisper-cli
+export WHISPER_MODEL=/path/to/ggml-small.bin
+```
 
-This way everyone gets a one‑download setup, without bloating the git history.
-
-Then the console will use `/api/stt` locally.
+(You can build whisper.cpp from source and copy the resulting `whisper-cli` into `./bin/`.)
 
 ## Security notes
 
@@ -121,7 +122,7 @@ Do **NOT** commit these files:
 - `device.json` (contains private key)
 - model binaries (`*.bin`), executables (`*.exe`/`*.dll`)
 
-This repo’s `.gitignore` excludes them.
+This repo's `.gitignore` excludes them.
 
 ## License
 
