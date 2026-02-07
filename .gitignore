@@ -1,0 +1,21 @@
+# Secrets / identity
+device.json
+**/device.json
+
+# Models / binaries
+models/
+**/*.bin
+bin/
+**/*.exe
+**/*.dll
+**/*.wav
+**/*.mp3
+
+# Backup / build artifacts
+Backup/
+whisper.cpp-src/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.log
