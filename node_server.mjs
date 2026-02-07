@@ -53,13 +53,22 @@ function fromBase64url(s) {
 }
 
 // ----- Local STT (whisper-cli) -----
-function runWhisperCli(wavBuf) {
-  const exe = path.join(BIN_DIR, 'whisper-cli.exe');
-  const model = path.join(MODEL_DIR, 'ggml-small.bin');
-  if (!fs.existsSync(exe)) throw new Error('whisper-cli.exe not found');
-  if (!fs.existsSync(model)) throw new Error('model not found');
+function resolveWhisper(){
+  const isWin = process.platform === 'win32';
+  const exeDefault = path.join(BIN_DIR, isWin ? 'whisper-cli.exe' : 'whisper-cli');
+  const exe = process.env.WHISPER_CLI || exeDefault;
+  const modelDefault = path.join(MODEL_DIR, 'ggml-small.bin');
+  const model = process.env.WHISPER_MODEL || modelDefault;
+  return { exe, model };
+}
 
-  const tmpDir = fs.mkdtempSync(path.join(process.env.TEMP || process.env.TMP || '.', 'openclaw-voice-'));
+function runWhisperCli(wavBuf) {
+  const { exe, model } = resolveWhisper();
+  if (!fs.existsSync(exe)) throw new Error(`whisper-cli not found: ${exe}`);
+  if (!fs.existsSync(model)) throw new Error(`whisper model not found: ${model}`);
+
+  const tmpRoot = process.env.TEMP || process.env.TMP || (process.platform === 'win32' ? '.' : '/tmp');
+  const tmpDir = fs.mkdtempSync(path.join(tmpRoot, 'openclaw-voice-'));
   const wavPath = path.join(tmpDir, 'in.wav');
   const outPrefix = path.join(tmpDir, 'out');
   fs.writeFileSync(wavPath, wavBuf);
@@ -108,10 +117,12 @@ function sanitizeForTts(input){
 
 // ----- Local TTS (Windows SAPI5) -----
 function runTtsLocal(text, voiceName) {
+  if (process.platform !== 'win32') throw new Error('Local Windows TTS is only available on Windows');
   text = sanitizeForTts(text);
   const ps1 = path.join(ROOT, 'tts_de.ps1');
   if (!fs.existsSync(ps1)) throw new Error('tts_de.ps1 missing');
-  const outPath = path.join(process.env.TEMP || process.env.TMP || '.', `openclaw-tts-local-${Date.now()}.wav`);
+  const tmpRoot = process.env.TEMP || process.env.TMP || '.';
+  const outPath = path.join(tmpRoot, `openclaw-tts-local-${Date.now()}.wav`);
   const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-Text', text, '-OutFile', outPath];
   if (voiceName && String(voiceName).trim()) {
     args.push('-VoiceName', String(voiceName));
@@ -124,20 +135,19 @@ function runTtsLocal(text, voiceName) {
 // ----- Cloud TTS (Edge Neural via edge-tts python, no API key) -----
 function runTtsEdge(text, voiceId) {
   text = sanitizeForTts(text);
-  const py = process.env.PYTHON || 'python';
+  const py = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
   const script = path.join(ROOT, 'edge_tts_say.py');
   if (!fs.existsSync(script)) throw new Error('edge_tts_say.py missing');
 
-  // Edge TTS writes mp3 by default when file ends with .mp3
-  const outPath = path.join(process.env.TEMP || process.env.TMP || '.', `openclaw-tts-edge-${Date.now()}.mp3`);
+  const tmpRoot = process.env.TEMP || process.env.TMP || (process.platform === 'win32' ? '.' : '/tmp');
+  const outPath = path.join(tmpRoot, `openclaw-tts-edge-${Date.now()}.mp3`);
   const voice = voiceId && String(voiceId).trim() ? String(voiceId).trim() : 'de-DE-KatjaNeural';
 
-  const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `${py} "${script}" --voice "${voice}" --out "${outPath}" --text @'
-${text.replaceAll("'", "''")}
-'@`];
-
-  // We shell through PowerShell to avoid Windows argv quoting edge cases for large unicode text.
-  const p = child_process.spawnSync('powershell', args, { encoding: 'utf-8', maxBuffer: 20 * 1024 * 1024 });
+  // Run python directly (cross-platform)
+  const p = child_process.spawnSync(py, [script, '--voice', voice, '--out', outPath, '--text', text], {
+    encoding: 'utf-8',
+    maxBuffer: 20 * 1024 * 1024,
+  });
   if (p.status !== 0) throw new Error((p.stderr || p.stdout || '').trim() || `Edge TTS failed (${p.status})`);
   return { outPath, contentType: 'audio/mpeg' };
 }
@@ -438,12 +448,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && u.pathname === '/api/tts/providers') {
+      const isWin = process.platform === 'win32';
+      const providers = [
+        ...(isWin ? [{ id: 'local', name: 'Lokal (Windows/SAPI5)' }] : []),
+        { id: 'edge', name: 'Cloud (Edge Neural, ohne API-Key)' },
+      ];
       return sendJson(res, 200, {
-        providers: [
-          { id: 'local', name: 'Lokal (Windows/SAPI5)' },
-          { id: 'edge', name: 'Cloud (Edge Neural, ohne API-Key)' },
-        ],
-        defaultProvider: 'local',
+        providers,
+        defaultProvider: isWin ? 'local' : 'edge',
         defaultEdgeVoice: 'de-DE-KatjaNeural',
       });
     }

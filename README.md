@@ -21,29 +21,42 @@ Optional (for local STT):
 
 ## Install
 
-### 1) Get the code
+### Windows
 
 ```powershell
 git clone <THIS_REPO_URL>
 cd openclaw-voice-console
-```
-
-### 2) Install Edge Neural TTS (no API key)
-
-```powershell
 python -m pip install --upgrade edge-tts
-```
-
-### 3) Start the Voice Console
-
-The start script reads your OpenClaw token from `~/.openclaw/openclaw.json`.
-
-```powershell
 .\start_voice_console.ps1
 ```
 
 Open:
 - http://127.0.0.1:4888/
+
+### Debian / Raspberry Pi OS (Linux)
+
+```bash
+git clone <THIS_REPO_URL>
+cd openclaw-voice-console
+
+# deps
+sudo apt update
+sudo apt install -y nodejs npm python3 python3-pip
+
+# edge tts (no api key)
+python3 -m pip install --user --upgrade edge-tts
+
+# run (token required)
+export OPENCLAW_TOKEN="..."
+./start_voice_console.sh
+```
+
+Open:
+- http://127.0.0.1:4888/
+
+Notes:
+- On Linux, TTS defaults to **Edge Neural** (Windows SAPI voices are Windows-only).
+- Local STT requires `whisper-cli` + a model; see below.
 
 ## Screenshots
 
@@ -83,6 +96,11 @@ This repo contains helper scripts, but it does **not** ship large binaries/model
 You need:
 - `bin/whisper-cli.exe`
 - `models/<ggml-model>.bin` (e.g. `ggml-small.bin`)
+
+### Linux note
+
+For Linux you’ll want a **Linux** `whisper-cli` binary (not the Windows `.exe`).
+You can either build it from whisper.cpp or ship a separate linux binary (Release asset).
 
 ### Recommended: download from GitHub Releases (includes exe + model)
 
