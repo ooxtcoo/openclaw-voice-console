@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -212,8 +212,8 @@
     <div class="top" id="topBar">
       <div class="title">OpenClaw Voice Console<span class="sub">by Harald Kubovy</span></div>
       <div class="row" style="gap:8px">
-        <button id="btnFs" title="Vollbild / Kiosk">Vollbild</button>
-        <button id="btnSettings" title="Settings ein/aus">Settings</button>
+        <button id="btnFs" title="Fullscreen / Kiosk">Fullscreen</button>
+        <button id="btnSettings" title="Toggle settings">Settings</button>
         <div class="pill" id="statusPill">initializing…</div>
       </div>
     </div>
@@ -224,24 +224,24 @@
           <canvas id="c"></canvas>
         </div>
         <div class="controls" id="controls">
-          <button class="primary" id="btnPtt">Hold to talk</button>
+          <button class="primary" id="btnPtt">Tap to talk</button>
           <button id="btnAuto">Auto: OFF</button>
           <button class="danger" id="btnStop" disabled>Stop</button>
         </div>
         <div style="margin-top:10px" class="row" id="rowSettingsInline">
           <div class="toggle">
-            <span>Mikro</span>
+            <span>Microphone</span>
             <select id="mic"></select>
           </div>
           <div class="toggle">
             <span>TTS</span>
             <select id="ttsProvider">
-              <option value="local">Lokal</option>
+              <option value="local">Local</option>
               <option value="edge">Cloud</option>
             </select>
           </div>
           <div class="toggle" id="voiceLocalWrap">
-            <span>Stimme</span>
+            <span>Voice</span>
             <select id="voice"></select>
           </div>
           <div class="toggle" id="voiceEdgeWrap" style="display:none">
@@ -253,17 +253,17 @@
             </select>
           </div>
           <div class="toggle">
-            <span>Untertitel</span>
+            <span>Captions</span>
             <select id="captions">
-              <option value="off">aus</option>
-              <option value="on">an</option>
+              <option value="off">off</option>
+              <option value="on">on</option>
             </select>
           </div>
           <div class="toggle">
             <span>Session</span>
             <span id="sessionKey" style="color: var(--fg)">main</span>
           </div>
-          <div class="muted" id="hint">Mikro erlauben. Dann sprechen.</div>
+          <div class="muted" id="hint">Allow microphone access, then speak.</div>
         </div>
       </div>
 
@@ -271,7 +271,7 @@
     </div>
 
     <div class="muted" style="margin-top:12px">
-      STT: lokal via whisper.cpp (de). TTS: lokal (Windows/SAPI5) oder Cloud (Edge Neural, ohne API-Key).
+      STT: local via whisper.cpp. TTS: local (Windows/SAPI5) or cloud (Edge Neural, no API key).
     </div>
   </div>
 
@@ -286,15 +286,15 @@
     <div class="sec">
       <h3>Face</h3>
       <div>
-        <label>Größe <span class="val" id="v_faceScale"></span></label>
+        <label>Scale <span class="val" id="v_faceScale"></span></label>
         <input id="faceScale" type="range" min="0.6" max="2.2" step="0.01" />
       </div>
       <div>
-        <label>Ovalität (Breite) <span class="val" id="v_faceOvalX"></span></label>
+        <label>Oval (width) <span class="val" id="v_faceOvalX"></span></label>
         <input id="faceOvalX" type="range" min="0.60" max="1.20" step="0.01" />
       </div>
       <div>
-        <label>Ovalität (Höhe) <span class="val" id="v_faceOvalY"></span></label>
+        <label>Oval (height) <span class="val" id="v_faceOvalY"></span></label>
         <input id="faceOvalY" type="range" min="0.85" max="1.45" step="0.01" />
       </div>
       <div>
@@ -302,13 +302,13 @@
         <input id="faceForward" type="range" min="0.85" max="1.20" step="0.01" />
       </div>
       <div>
-        <label>Wireframe Stärke <span class="val" id="v_wireOpacity"></span></label>
+        <label>Wireframe strength <span class="val" id="v_wireOpacity"></span></label>
         <input id="wireOpacity" type="range" min="0.05" max="0.85" step="0.01" />
       </div>
     </div>
 
     <div class="sec">
-      <h3>Mund</h3>
+      <h3>Mouth</h3>
       <div>
         <label>Mouth Width <span class="val" id="v_mouthWidth"></span></label>
         <input id="mouthWidth" type="range" min="0.10" max="0.40" step="0.01" />
@@ -324,7 +324,7 @@
     </div>
 
     <div class="sec">
-      <h3>Augen</h3>
+      <h3>Eyes</h3>
       <div>
         <label>Eye Size <span class="val" id="v_eyeSize"></span></label>
         <input id="eyeSize" type="range" min="0.06" max="0.20" step="0.01" />
@@ -334,7 +334,7 @@
         <input id="eyeGaze" type="range" min="0" max="0.20" step="0.01" />
       </div>
       <div>
-        <label>Pupillen Größe <span class="val" id="v_pupilSize"></span></label>
+        <label>Pupil size <span class="val" id="v_pupilSize"></span></label>
         <input id="pupilSize" type="range" min="0.006" max="0.060" step="0.001" />
       </div>
     </div>
@@ -357,6 +357,6 @@
     </div>
   </div>
 
-<script type="module" src="app.js?v=20260207i"></script>
+<script type="module" src="app.js?v=20260207j"></script>
 </body>
 </html>
