@@ -45,6 +45,17 @@ The start script reads your OpenClaw token from `~/.openclaw/openclaw.json`.
 Open:
 - http://127.0.0.1:4888/
 
+## Screenshots
+
+Add your screenshots here:
+- `screenshots/screenshot_1.png` (normal)
+- `screenshots/screenshot_2.png` (fullscreen)
+
+Once they exist, the images below will render on GitHub:
+
+![Screenshot 1](screenshots/screenshot_1.png)
+![Screenshot 2](screenshots/screenshot_2.png)
+
 ## Usage
 
 ### Talk
@@ -67,11 +78,22 @@ Settings persist in browser `localStorage`.
 
 ## Local STT (whisper.cpp)
 
-This repo contains helper scripts, but it does **not** ship large binaries/models.
+This repo contains helper scripts, but it does **not** ship large binaries/models in normal commits.
 
 You need:
 - `bin/whisper-cli.exe`
-- `models/<ggml-model>.bin`
+- `models/<ggml-model>.bin` (e.g. `ggml-small.bin`)
+
+### Recommended: download from GitHub Releases (includes exe + model)
+
+On the GitHub repo page:
+1) Go to **Releases** → **Create a new release**
+2) Upload a ZIP that contains:
+   - `bin/whisper-cli.exe`
+   - `models/ggml-small.bin`
+3) In the README/release notes, tell users to extract the ZIP into the repo root.
+
+This way everyone gets a one‑download setup, without bloating the git history.
 
 Then the console will use `/api/stt` locally.
 
