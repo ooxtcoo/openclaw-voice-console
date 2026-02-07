@@ -508,6 +508,13 @@ function wavEncode(samples, sampleRate){
 let stopRequested = false;
 let stopRecordingNow = null;
 
+// --- Recording / VAD tuning ---
+// Goal: don't cut users off between words; wait a bit after the last spoken sound.
+// (The UI previously felt "snappy" but can truncate longer sentences.)
+const VAD_RMS_START = 0.020;      // starts speech
+const VAD_RMS_CONTINUE = 0.012;   // continues speech once started (more forgiving)
+const VAD_SILENCE_MS = 1200;      // wait at least 1.2s of silence before ending
+
 async function recordOnce({maxMs=15000, vad=true}={}){
   await ensureMic();
   await audioCtx.resume();
@@ -560,15 +567,23 @@ async function recordOnce({maxMs=15000, vad=true}={}){
     for (let i=0;i<input.length;i++) sum += input[i]*input[i];
     const rms = Math.sqrt(sum/input.length);
     const now = performance.now();
-    if (rms > 0.02){
-      speech = true;
-      lastVoiceAt = now;
+    // Start/continue speech detection
+    if (!speech) {
+      if (rms > VAD_RMS_START) {
+        speech = true;
+        lastVoiceAt = now;
+      }
+    } else {
+      // once speech has started, be more forgiving so we don't cut off soft syllables
+      if (rms > VAD_RMS_CONTINUE) {
+        lastVoiceAt = now;
+      }
     }
 
     if (stopRequested) {
       rec = false;
-    } else if (vad && speech && (now - lastVoiceAt) > 700){
-      // slightly snappier end
+    } else if (vad && speech && (now - lastVoiceAt) > VAD_SILENCE_MS){
+      // Wait long enough after the last detected voice before ending
       rec = false;
     } else if (now - startedAt > maxMs){
       rec = false;
