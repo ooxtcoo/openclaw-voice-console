@@ -68,12 +68,6 @@ Notes:
 
 ## Screenshots
 
-Add your screenshots here:
-- `screenshots/screenshot_1.png` (normal)
-- `screenshots/screenshot_2.png` (fullscreen)
-
-Once they exist, the images below will render on GitHub:
-
 ![Screenshot 1](screenshots/screenshot_1.png)
 ![Screenshot 2](screenshots/screenshot_2.png)
 
