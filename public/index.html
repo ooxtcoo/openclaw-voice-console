@@ -233,6 +233,27 @@
             <span>Microphone</span>
             <select id="mic"></select>
           </div>
+          <div class="toggle" title="Browser audio processing can clip word onsets. Toggle to debug STT quality.">
+            <span>Echo</span>
+            <select id="micEcho">
+              <option value="1">on</option>
+              <option value="0">off</option>
+            </select>
+          </div>
+          <div class="toggle" title="Noise suppression can cut consonants at the start of words.">
+            <span>Noise</span>
+            <select id="micNoise">
+              <option value="0">off</option>
+              <option value="1">on</option>
+            </select>
+          </div>
+          <div class="toggle" title="Auto gain control can clip beginnings. Usually better OFF for STT.">
+            <span>AGC</span>
+            <select id="micAgc">
+              <option value="0">off</option>
+              <option value="1">on</option>
+            </select>
+          </div>
           <div class="toggle">
             <span>TTS</span>
             <select id="ttsProvider">

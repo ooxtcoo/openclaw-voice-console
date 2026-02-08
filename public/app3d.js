@@ -18,6 +18,9 @@ const btnAutoDrawer = document.getElementById('btnAutoDrawer');
 const btnStopDrawer = document.getElementById('btnStopDrawer');
 const btnDebugDrawer = document.getElementById('btnDebugDrawer');
 const micSel = document.getElementById('mic');
+const micEchoSel = document.getElementById('micEcho');
+const micNoiseSel = document.getElementById('micNoise');
+const micAgcSel = document.getElementById('micAgc');
 
 const voiceSel = document.getElementById('voice');
 const captionsSel = document.getElementById('captions');
@@ -808,6 +811,11 @@ animate();
 let selectedMicId = localStorage.getItem('micId') || '';
 let selectedVoiceName = localStorage.getItem('voiceName') || '';
 
+// Mic processing toggles (persisted)
+let micEcho = (localStorage.getItem('micEcho') ?? '1');
+let micNoise = (localStorage.getItem('micNoise') ?? '0');
+let micAgc = (localStorage.getItem('micAgc') ?? '0');
+
 // TTS provider
 let ttsProvider = localStorage.getItem('ttsProvider') || 'local';
 let edgeVoiceId = localStorage.getItem('edgeVoiceId') || 'de-DE-KatjaNeural';
@@ -889,11 +897,14 @@ async function ensureMic(){
 
   _stopMicRingBuffer();
 
-  // Note: browser audio processing (AGC/noise suppression) can sometimes clip word onsets.
-  // We keep echoCancellation on, but disable autoGainControl by default for cleaner STT.
+  // Note: browser audio processing can clip word onsets (esp. noise suppression + AGC).
+  // Provide toggles so we can tune per-microphone.
+  const ec = (String(micEcho) !== '0');
+  const ns = (String(micNoise) === '1');
+  const agc = (String(micAgc) === '1');
   const constraints = selectedMicId
-    ? { audio: { deviceId: { exact: selectedMicId }, echoCancellation: true, noiseSuppression: true, autoGainControl: false } }
-    : { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } };
+    ? { audio: { deviceId: { exact: selectedMicId }, echoCancellation: ec, noiseSuppression: ns, autoGainControl: agc } }
+    : { audio: { echoCancellation: ec, noiseSuppression: ns, autoGainControl: agc } };
 
   stream = await navigator.mediaDevices.getUserMedia(constraints);
 
@@ -935,6 +946,13 @@ async function refreshMicList(){
     try { localStorage.removeItem('micId'); } catch {}
   }
   micSel.value = selectedMicId;
+
+  // apply mic processing UI
+  try {
+    if (micEchoSel) micEchoSel.value = String(micEcho);
+    if (micNoiseSel) micNoiseSel.value = String(micNoise);
+    if (micAgcSel) micAgcSel.value = String(micAgc);
+  } catch {}
 }
 
 
@@ -1933,6 +1951,23 @@ boot().then(async () => {
       } catch {}
       await refreshMicList();
     });
+
+    // Mic processing toggles
+    const onMicProcChange = async () => {
+      micEcho = micEchoSel?.value ?? micEcho;
+      micNoise = micNoiseSel?.value ?? micNoise;
+      micAgc = micAgcSel?.value ?? micAgc;
+      try {
+        localStorage.setItem('micEcho', String(micEcho));
+        localStorage.setItem('micNoise', String(micNoise));
+        localStorage.setItem('micAgc', String(micAgc));
+      } catch {}
+      // re-acquire mic with new constraints
+      try { await ensureMic(); } catch {}
+    };
+    micEchoSel?.addEventListener('change', onMicProcChange);
+    micNoiseSel?.addEventListener('change', onMicProcChange);
+    micAgcSel?.addEventListener('change', onMicProcChange);
 
     // Voices
     const v = await fetch('/api/voices').then(r=>r.json());

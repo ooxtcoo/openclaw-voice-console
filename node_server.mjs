@@ -124,9 +124,12 @@ function runWhisperCli(wavBuf) {
     }
     const txtPath = outPrefix + '.txt';
     const text = fs.existsSync(txtPath) ? fs.readFileSync(txtPath, 'utf-8').trim() : (p.stdout || '').trim();
-    return text;
+    return { text, debugWavPath: wavPath, debugTmpDir: tmpDir };
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    // Keep tmp dir if STT_DUMP=1 so we can inspect the recorded WAV.
+    if (String(process.env.STT_DUMP || '').trim() !== '1') {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
   }
 }
 
@@ -452,8 +455,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && u.pathname === '/api/stt') {
       const body = await readBody(req);
-      const text = runWhisperCli(body);
-      return sendJson(res, 200, { text });
+      const out = runWhisperCli(body);
+      if (typeof out === 'string') return sendJson(res, 200, { text: out });
+      // newer versions return debug info
+      return sendJson(res, 200, { text: out.text || '', debugWavPath: out.debugWavPath, debugTmpDir: out.debugTmpDir });
     }
 
     if (req.method === 'POST' && u.pathname === '/api/chat') {
