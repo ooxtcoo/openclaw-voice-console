@@ -9,7 +9,11 @@ ROOT = Path(__file__).resolve().parent
 BIN_DIR = ROOT / "bin"
 MODEL_DIR = ROOT / "models"
 
-WHISPER_CPP_ZIP_URL = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.7.5/whisper-bin-x64.zip"
+# NOTE: whisper.cpp release assets move around over time. We resolve the latest
+# Windows x64 binary zip via the GitHub Releases API to avoid hardcoding a dead URL.
+WHISPER_CPP_LATEST_API = "https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest"
+WHISPER_CPP_ASSET_NAME = "whisper-bin-x64.zip"
+
 MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
 
 
@@ -20,6 +24,31 @@ def download(url: str) -> bytes:
         return resp.read()
 
 
+def resolve_whisper_zip_url() -> str:
+    # Fetch latest release JSON and pick the desired asset.
+    try:
+        raw = download(WHISPER_CPP_LATEST_API)
+    except Exception as e:
+        raise RuntimeError(f"failed to fetch whisper.cpp latest release metadata: {e}")
+
+    try:
+        import json
+
+        j = json.loads(raw.decode("utf-8"))
+        assets = j.get("assets") or []
+        for a in assets:
+            if a.get("name") == WHISPER_CPP_ASSET_NAME and a.get("browser_download_url"):
+                return str(a["browser_download_url"])
+
+        # Helpful error message with available asset names
+        names = [a.get("name") for a in assets if isinstance(a, dict) and a.get("name")]
+        raise RuntimeError(
+            f"asset '{WHISPER_CPP_ASSET_NAME}' not found in latest release. Available: {names}"
+        )
+    except Exception as e:
+        raise RuntimeError(f"failed to parse whisper.cpp release metadata: {e}")
+
+
 def main() -> int:
     BIN_DIR.mkdir(parents=True, exist_ok=True)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -27,10 +56,13 @@ def main() -> int:
     whisper_cli = BIN_DIR / "whisper-cli.exe"
     if not whisper_cli.exists():
         try:
-            data = download(WHISPER_CPP_ZIP_URL)
+            zip_url = resolve_whisper_zip_url()
+            data = download(zip_url)
         except Exception as e:
             print("ERROR: failed to download whisper.cpp binaries:", e)
             print("You can manually place whisper-cli.exe into:", BIN_DIR)
+            print("Or download the asset:", WHISPER_CPP_ASSET_NAME)
+            print("From:", "https://github.com/ggml-org/whisper.cpp/releases/latest")
             return 2
 
         try:
