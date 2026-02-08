@@ -11,6 +11,12 @@ const btnExitKiosk = document.getElementById('btnExitKiosk');
 const btnPtt = document.getElementById('btnPtt');
 const btnAuto = document.getElementById('btnAuto');
 const btnStop = document.getElementById('btnStop');
+
+// Drawer duplicates (for fullscreen usability)
+const btnPttDrawer = document.getElementById('btnPttDrawer');
+const btnAutoDrawer = document.getElementById('btnAutoDrawer');
+const btnStopDrawer = document.getElementById('btnStopDrawer');
+const btnDebugDrawer = document.getElementById('btnDebugDrawer');
 const micSel = document.getElementById('mic');
 
 const voiceSel = document.getElementById('voice');
@@ -1654,24 +1660,50 @@ async function boot(){
 
   applyFullscreen(startFs);
 
+  function syncControlLabels(){
+    try {
+      btnAuto.textContent = `Auto: ${autoMode ? 'ON' : 'OFF'}`;
+      if (btnAutoDrawer) btnAutoDrawer.textContent = btnAuto.textContent;
+
+      // Stop button state mirrors
+      if (btnStopDrawer) btnStopDrawer.disabled = btnStop.disabled;
+
+      // Debug button mirrors captions
+      const dbgOn = (captionsSel?.value === 'on');
+      if (btnDebugDrawer) btnDebugDrawer.textContent = `Debug: ${dbgOn ? 'ON' : 'OFF'}`;
+    } catch {}
+  }
+
   btnAuto.addEventListener('click', () => {
     setAuto(!autoMode);
     try { localStorage.setItem('auto', autoMode ? '1' : '0'); } catch {}
-    btnAuto.textContent = `Auto: ${autoMode ? 'ON' : 'OFF'}`;
+    syncControlLabels();
     if (autoMode) loopAuto();
   });
 
   // Start auto immediately if requested (useful for fullscreen/kiosk)
   if (startAuto) {
     setAuto(true);
-    btnAuto.textContent = 'Auto: ON';
+    syncControlLabels();
     loopAuto();
+  } else {
+    syncControlLabels();
   }
 
   // Stop: stop recording and stop any playback immediately
   let currentAudio = null;
 
-  btnStop.addEventListener('click', async () => {
+  // Drawer mirrors: forward clicks to main buttons
+  btnAutoDrawer?.addEventListener('click', () => { try { btnAuto.click(); } catch {} });
+  btnDebugDrawer?.addEventListener('click', () => {
+    try {
+      captionsSel.value = (captionsSel.value === 'on') ? 'off' : 'on';
+      try { localStorage.setItem('captions', captionsSel.value); } catch {}
+      syncControlLabels();
+    } catch {}
+  });
+
+  async function doStop(){
     stopRequested = true;
     if (typeof stopRecordingNow === 'function') stopRecordingNow();
 
@@ -1690,6 +1722,15 @@ async function boot(){
     stopFlashUntil = performance.now() + 900;
     setMode('idle');
     log('stopped');
+    syncControlLabels();
+  }
+
+  btnStop.addEventListener('click', async () => {
+    await doStop();
+  });
+
+  btnStopDrawer?.addEventListener('click', async () => {
+    await doStop();
   });
 
   // Push-to-talk: CLICK to start, CLICK again to stop (works better on mobile)
@@ -1723,18 +1764,29 @@ async function boot(){
     }
   };
 
-  btnPtt.addEventListener('click', async () => {
+  async function doPttToggle(){
     if (holding) {
       // second tap stops recording immediately
       stopRequested = true;
       if (typeof stopRecordingNow === 'function') stopRecordingNow();
+      syncControlLabels();
       return;
     }
     holding = true;
     stopRequested = false;
+    syncControlLabels();
     await doOneUtterance().catch(e => {
       log('PTT error:', String(e));
     });
+    syncControlLabels();
+  }
+
+  btnPtt.addEventListener('click', async () => {
+    await doPttToggle();
+  });
+
+  btnPttDrawer?.addEventListener('click', async () => {
+    await doPttToggle();
   });
 
   // Override playAudio to allow Stop to interrupt playback
