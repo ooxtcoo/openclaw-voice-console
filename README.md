@@ -73,9 +73,16 @@ Notes:
 
 ## Usage
 
-### Talk
-- Tap/click **Tap to talk**
-- In fullscreen, press **Space** to toggle push-to-talk
+### Talk modes
+
+**Auto mode (recommended)**
+- Click **Auto: ON/OFF**
+- Hotkey: **Space** toggles **Auto ON/OFF** (works in fullscreen/kiosk)
+- Auto listens for voice, records one utterance (VAD), then sends it.
+
+**Push-to-talk (optional)**
+- Click **Tap to talk** to start recording
+- Click again (or **Stop**) to stop
 
 ### Fullscreen / Kiosk
 - Button: **Fullscreen**
@@ -83,9 +90,19 @@ Notes:
   - **F** toggle fullscreen layout
   - **S** / **F1** toggle Settings drawer overlay
   - **ESC** exit fullscreen
+  - **Space** toggles **Auto ON/OFF**
 
 You can also force exit sticky fullscreen:
 - `http://127.0.0.1:4888/?fullscreen=0`
+
+### URL parameters (startup)
+Useful for kiosk setups:
+- Start fullscreen: `?fullscreen=1`
+- Start with Auto enabled: `?auto=true` (or `?auto=1`)
+- Force Auto disabled: `?auto=false` (or `?auto=0`)
+
+Examples:
+- `http://127.0.0.1:4888/?fullscreen=1&auto=true`
 
 ### Settings drawer
 Use sliders to tune the face (oval/scale/forward), eyes (gaze/pupils), mouth (smile/open), motion, etc.
@@ -93,17 +110,24 @@ Settings persist in browser `localStorage`.
 
 ## Local STT (whisper.cpp)
 
+Notes:
+- The repo does **not** ship large binaries/models in git.
+- On **Windows**, missing STT assets are auto-downloaded on demand.
+- On **Linux**, you currently need to provide/build `whisper-cli` yourself (see below).
+
 ### Windows
 
-On first run, `start_voice_console.ps1` will automatically download:
-- `whisper-cli.exe` (from the official whisper.cpp release zip)
-- the `ggml-small.bin` model
+If STT binaries/models are missing, the server will automatically run `setup_whisper.py` to download:
+- `bin/whisper-cli.exe` (from the official whisper.cpp **latest** release zip)
+- `models/ggml-small.bin`
 
 So Windows users can do **clone → run** with no manual steps.
 
 ### Debian / Raspberry Pi OS (Linux)
 
-Provide a Linux `whisper-cli` binary and a model, then point the server at them:
+Auto-download of `whisper-cli` is currently **Windows-only**.
+
+On Linux, provide a Linux `whisper-cli` binary and a model, then point the server at them:
 
 ```bash
 export WHISPER_CLI=/path/to/whisper-cli
