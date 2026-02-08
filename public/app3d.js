@@ -681,8 +681,9 @@ function animate(){
 
   // Hide pupils when eyelids close enough to "touch" them (otherwise it looks wrong)
   try {
-    if (pupilL) pupilL.visible = !eyeL || (eyeL.scale.y > 0.38);
-    if (pupilR) pupilR.visible = !eyeR || (eyeR.scale.y > 0.38);
+    // Hide pupils fairly early while closing, show again only when clearly open.
+    if (pupilL) pupilL.visible = !eyeL || (eyeL.scale.y > 0.68);
+    if (pupilR) pupilR.visible = !eyeR || (eyeR.scale.y > 0.68);
   } catch {}
 
   // Mouth animation (line-based)
@@ -897,7 +898,7 @@ async function recordOnce({maxMs=15000, vad=true}={}){
   // keep a short pre-roll so we don't clip the start of speech
   let preRoll = [];
   let preRollSec = 0;
-  const PRE_ROLL_TARGET_SEC = 0.65;
+  const PRE_ROLL_TARGET_SEC = 1.10;
 
   let rec = true;
   let startedAt = performance.now();
@@ -951,11 +952,11 @@ async function recordOnce({maxMs=15000, vad=true}={}){
     const now = performance.now();
     // VAD tuning: avoid cutting off between words.
     // Start requires a firmer threshold; once speaking, allow lower energy to keep the turn alive.
-    const SPEECH_RMS_START = 0.015;
-    const SPEECH_RMS_CONTINUE = 0.009;
-    const NO_SPEECH_ABORT_MS = 1400;
-    const MIN_SPEECH_MS = 50;
-    const END_SILENCE_MS = 1600;
+    const SPEECH_RMS_START = 0.010;
+    const SPEECH_RMS_CONTINUE = 0.007;
+    const NO_SPEECH_ABORT_MS = 1800;
+    const MIN_SPEECH_MS = 25;
+    const END_SILENCE_MS = 1900;
 
     const gate = speech ? SPEECH_RMS_CONTINUE : SPEECH_RMS_START;
     if (rms > gate){
@@ -1233,10 +1234,16 @@ async function boot(){
   }
 
   let currentRunId = null;
+  let currentChatAbort = null;
 
   async function abortCurrentRun(){
     const runId = currentRunId;
     currentRunId = null;
+
+    // Abort the streaming fetch immediately (otherwise Auto can hang waiting for the stream)
+    try { currentChatAbort?.abort(); } catch {}
+    currentChatAbort = null;
+
     if (!runId) return;
     try {
       await fetch('/api/chat/abort', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ runId }) });
@@ -1249,7 +1256,8 @@ async function boot(){
     // Streaming (SSE over fetch): show deltas immediately, speak on final.
     let r = null;
     try {
-      r = await fetch('/api/chat/stream', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})});
+      currentChatAbort = new AbortController();
+      r = await fetch('/api/chat/stream', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}), signal: currentChatAbort.signal });
     } catch (e) {
       r = null;
     }
@@ -1269,7 +1277,14 @@ async function boot(){
     let lastDeltaText = '';
 
     while (true){
-      const { value, done } = await reader.read();
+      let chunk;
+      try {
+        chunk = await reader.read();
+      } catch (e) {
+        // aborted / network error
+        break;
+      }
+      const { value, done } = chunk;
       if (done) break;
       buf += dec.decode(value, { stream:true });
 
@@ -1301,9 +1316,11 @@ async function boot(){
         } else if (evt.type === 'final' && typeof evt.text === 'string') {
           lastDeltaText = evt.text;
           currentRunId = null;
+          currentChatAbort = null;
           await speakAssistant(String(evt.text || ''));
         } else if (evt.type === 'error') {
           currentRunId = null;
+          currentChatAbort = null;
           // small negative blip on errors
           faceMoodTarget = clamp(faceMoodTarget - 0.35, -1, 1);
           triggerWink('both', 120);
