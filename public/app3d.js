@@ -739,7 +739,8 @@ function animate(){
   const open = mouth * 0.18 * settings.mouthStrength;
 
   // mood -> smile offset (keep user slider as baseline)
-  const moodSmile = clamp(settings.mouthSmile + faceMood * 0.42, -1, 1);
+  // Stronger mapping so expressions read clearly even when idle.
+  const moodSmile = clamp(settings.mouthSmile + faceMood * 0.95, -1.2, 1.2);
 
   const pts = mouthGeo.getAttribute('position');
   const n = pts.count - 1;
@@ -751,7 +752,7 @@ function animate(){
     const x = Math.cos(tArc) * settings.mouthWidth;
     const arc = Math.sin(tArc) * 0.03;
     const corner = Math.pow(Math.abs(Math.cos(tArc)), 1.25);
-    const smile = moodSmile * 0.22 * corner;
+    const smile = moodSmile * 0.34 * corner;
 
     const mouthY0 = Number(settings.mouthY ?? -0.22);
     const baseY = mouthY0 + arc + smile;
