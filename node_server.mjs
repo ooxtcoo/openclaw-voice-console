@@ -59,7 +59,9 @@ function resolveWhisper(){
   const exe = process.env.WHISPER_CLI || exeDefault;
   const modelDefault = path.join(MODEL_DIR, 'ggml-small.bin');
   const model = process.env.WHISPER_MODEL || modelDefault;
-  return { exe, model };
+  const prompt = process.env.WHISPER_PROMPT || '';
+  const carryPrompt = String(process.env.WHISPER_CARRY_PROMPT || '').trim() === '1';
+  return { exe, model, prompt, carryPrompt };
 }
 
 function ensureWhisperInstalled(){
@@ -81,7 +83,7 @@ function ensureWhisperInstalled(){
 }
 
 function runWhisperCli(wavBuf) {
-  const { exe, model } = resolveWhisper();
+  const { exe, model, prompt, carryPrompt } = resolveWhisper();
   if (!fs.existsSync(exe) || !fs.existsSync(model)) ensureWhisperInstalled();
 
   const tmpRoot = process.env.TEMP || process.env.TMP || (process.platform === 'win32' ? '.' : '/tmp');
@@ -97,12 +99,24 @@ function runWhisperCli(wavBuf) {
     '-l', 'de',
     '-nt',
     '-sns',
-    '--no-speech-thold', '0.45',
+    '--no-speech-thold', '0.30',
     '--entropy-thold', '3.20',
+  ];
+
+  // Optional bias / wake phrase hint (useful if the first words are often dropped)
+  if (prompt && String(prompt).trim()) {
+    args.push('--prompt', String(prompt));
+    if (carryPrompt || String(process.env.WHISPER_CARRY_PROMPT || '').trim() === 'true') {
+      args.push('--carry-initial-prompt');
+    }
+  }
+
+  args.push(
     '-of', outPrefix,
     '-otxt',
     wavPath,
-  ];
+  );
+
   const p = child_process.spawnSync(exe, args, { encoding: 'utf-8' });
   try {
     if (p.status !== 0) {

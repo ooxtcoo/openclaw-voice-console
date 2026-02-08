@@ -883,9 +883,11 @@ async function ensureMic(){
 
   _stopMicRingBuffer();
 
+  // Note: browser audio processing (AGC/noise suppression) can sometimes clip word onsets.
+  // We keep echoCancellation on, but disable autoGainControl by default for cleaner STT.
   const constraints = selectedMicId
-    ? { audio: { deviceId: { exact: selectedMicId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }
-    : { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
+    ? { audio: { deviceId: { exact: selectedMicId }, echoCancellation: true, noiseSuppression: true, autoGainControl: false } }
+    : { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } };
 
   stream = await navigator.mediaDevices.getUserMedia(constraints);
 
