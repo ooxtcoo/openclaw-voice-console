@@ -57,6 +57,7 @@ let faceMood = 0.0;
 let faceMoodTarget = 0.0;
 let faceArousal = 0.2;        // 0..1
 let faceArousalTarget = 0.2;
+let faceOverrideUntil = 0;    // ms timestamp; while active, don't blend base mood
 let winkL = 0.0;              // 0..1 (1 = closed)
 let winkR = 0.0;
 let winkUntilL = 0;
@@ -85,6 +86,7 @@ function startFaceDemo(){
   let i = 0;
   const apply = () => {
     const s = steps[i % steps.length];
+    faceOverrideUntil = performance.now() + 4500;
     faceMoodTarget = clamp(s.mood, -1, 1);
     faceArousalTarget = clamp(s.arousal, 0, 1);
     if (s.wink) triggerWink(String(s.wink), 180);
@@ -127,6 +129,8 @@ function extractFacePayload(text){
 
 function applyFacePayload(payload){
   if (!payload || typeof payload !== 'object') return;
+  // keep explicit face control stable for a moment
+  faceOverrideUntil = performance.now() + 4500;
 
   if (typeof payload.mood === 'number' && Number.isFinite(payload.mood)) {
     faceMoodTarget = clamp(payload.mood, -1, 1);
@@ -704,13 +708,18 @@ function animate(){
   else if (mode === 'listening') baseMood = 0.10;
   else if (mode === 'thinking') baseMood = -0.05;
   faceMoodTarget = clamp(faceMoodTarget, -1, 1);
-  faceMoodTarget = clamp(faceMoodTarget * 0.92 + baseMood * 0.08, -1, 1);
+  // Only blend base mood when we are not under an explicit override (FACE tag / demo)
+  if (performance.now() > faceOverrideUntil) {
+    faceMoodTarget = clamp(faceMoodTarget * 0.92 + baseMood * 0.08, -1, 1);
+  }
 
   let baseArousal = 0.2;
   if (mode === 'speaking') baseArousal = 0.7;
   else if (mode === 'listening') baseArousal = 0.6;
   else if (mode === 'thinking') baseArousal = 0.25;
-  faceArousalTarget = clamp(faceArousalTarget * 0.92 + baseArousal * 0.08, 0, 1);
+  if (performance.now() > faceOverrideUntil) {
+    faceArousalTarget = clamp(faceArousalTarget * 0.92 + baseArousal * 0.08, 0, 1);
+  }
 
   // Smooth
   faceMood = faceMood * 0.88 + faceMoodTarget * 0.12;
@@ -745,7 +754,7 @@ function animate(){
   // We treat this as a *bias* that should persist even while speaking.
   // Smooth separately to avoid visible "twitch" when mood target jumps.
   const moodSmileTarget = clamp(settings.mouthSmile + faceMood * 1.0, -1.25, 1.25);
-  mouthMoodBias = mouthMoodBias * 0.90 + moodSmileTarget * 0.10;
+  mouthMoodBias = mouthMoodBias * 0.96 + moodSmileTarget * 0.04;
 
   const pts = mouthGeo.getAttribute('position');
   const n = pts.count - 1;
@@ -756,9 +765,9 @@ function animate(){
     // Keep geometry consistent with current settings (incl. smile) even after reload.
     const x = Math.cos(tArc) * settings.mouthWidth;
     const arc = Math.sin(tArc) * 0.03;
-    // corner weight: closer to corners -> stronger bias
-    const corner = Math.pow(Math.abs(Math.cos(tArc)), 0.75);
-    const smile = mouthMoodBias * 0.40 * corner;
+    // Apply bias mostly to corners (so we don't create a V-shape / center kink)
+    const corner = Math.pow(Math.abs(Math.cos(tArc)), 3.5);
+    const smile = mouthMoodBias * 0.30 * corner;
 
     const mouthY0 = Number(settings.mouthY ?? -0.22);
     const baseY = mouthY0 + arc + smile;
