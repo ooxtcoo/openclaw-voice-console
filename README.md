@@ -4,7 +4,7 @@ A local-first voice mode for OpenClaw:
 
 - **STT (local):** `whisper.cpp` (optional, offline)
 - **TTS (local):** Windows SAPI5 voices
-- **TTS (no API key):** Microsoft Edge Neural voices via `edge-tts`
+- **TTS (no API key):** Microsoft Edge Neural voices via `edge-tts` (all languages)
 - **UI:** Sci-fi console + wireframe face + particles + kiosk/fullscreen + live tuning sliders
 
 > Status: V1 (works, still evolving)
@@ -25,6 +25,7 @@ A local-first voice mode for OpenClaw:
 
 Notes:
 - TTS on Linux uses **Edge Neural** via `edge-tts` (no API key).
+- Edge voices are loaded dynamically (all available languages/locales).
 - Local STT needs `whisper-cli` + a model; see below.
 
 ## Install

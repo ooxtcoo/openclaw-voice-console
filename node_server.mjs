@@ -187,6 +187,47 @@ function runTtsEdge(text, voiceId) {
   return { outPath, contentType: 'audio/mpeg' };
 }
 
+let edgeVoicesCache = null;
+let edgeVoicesCacheAt = 0;
+function listEdgeVoices(){
+  const now = Date.now();
+  if (edgeVoicesCache && (now - edgeVoicesCacheAt) < 24*60*60*1000) return edgeVoicesCache;
+
+  const py = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const p = child_process.spawnSync(py, ['-m', 'edge_tts', '--list-voices'], { encoding: 'utf-8', maxBuffer: 20 * 1024 * 1024 });
+  if (p.status !== 0) throw new Error((p.stderr || p.stdout || '').trim() || `edge-tts --list-voices failed (${p.status})`);
+
+  // edge-tts prints a table by default; JSON is supported on newer versions but not guaranteed.
+  // We'll parse a best-effort TSV-like table output.
+  const out = String(p.stdout || '').trim();
+  const lines = out.split(/\r?\n/).filter(Boolean);
+  // If it looks like JSON, parse it.
+  if (out.startsWith('[')) {
+    try {
+      const j = JSON.parse(out);
+      if (Array.isArray(j)) {
+        edgeVoicesCache = j;
+        edgeVoicesCacheAt = now;
+        return j;
+      }
+    } catch {}
+  }
+
+  // Table parsing fallback (very permissive)
+  // Expected columns (tabulate): Name | Gender | Locale | ...
+  const res = [];
+  for (const line of lines) {
+    if (line.startsWith('Name') || line.startsWith('---')) continue;
+    const parts = line.split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 3) continue;
+    const [Name, Gender, Locale] = parts;
+    res.push({ Name, Gender, Locale });
+  }
+  edgeVoicesCache = res;
+  edgeVoicesCacheAt = now;
+  return res;
+}
+
 // ----- Gateway WS client with device signing -----
 const DEVICE_FILE = path.join(ROOT, 'device.json');
 function loadOrCreateDevice() {
@@ -611,6 +652,15 @@ const server = http.createServer(async (req, res) => {
         defaultProvider: isWin ? 'local' : 'edge',
         defaultEdgeVoice: 'de-DE-KatjaNeural',
       });
+    }
+
+    if (req.method === 'GET' && u.pathname === '/api/edge/voices') {
+      try {
+        const voices = listEdgeVoices();
+        return sendJson(res, 200, { voices });
+      } catch (e) {
+        return sendJson(res, 500, { error: String(e?.message || e) });
+      }
     }
 
     if (req.method === 'POST' && u.pathname === '/api/tts') {

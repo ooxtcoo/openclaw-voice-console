@@ -1505,9 +1505,60 @@ async function boot(){
   }, 1500);
 
 
+  async function loadEdgeVoices(){
+    if (!edgeVoiceSel) return;
+    try {
+      const j = await fetch('/api/edge/voices').then(r=>r.json());
+      if (j.error) throw new Error(j.error);
+      const voices = Array.isArray(j.voices) ? j.voices : [];
+
+      // Normalize to { id, locale, gender }
+      const norm = voices.map(v => {
+        const id = v.ShortName || v.Name || v.id || v.voice || '';
+        const locale = v.Locale || v.locale || '';
+        const gender = v.Gender || v.gender || '';
+        return { id: String(id), locale: String(locale), gender: String(gender) };
+      }).filter(v => v.id);
+
+      norm.sort((a,b) => (a.locale + a.id).localeCompare(b.locale + b.id));
+
+      edgeVoiceSel.innerHTML = '';
+      const def = document.createElement('option');
+      def.value = '';
+      def.textContent = 'Default';
+      edgeVoiceSel.appendChild(def);
+
+      let lastLocale = null;
+      let group = null;
+      for (const v of norm) {
+        if (v.locale && v.locale !== lastLocale) {
+          lastLocale = v.locale;
+          group = document.createElement('optgroup');
+          group.label = v.locale;
+          edgeVoiceSel.appendChild(group);
+        }
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        opt.textContent = `${v.id}${v.gender ? ' ('+v.gender+')' : ''}`;
+        (group || edgeVoiceSel).appendChild(opt);
+      }
+
+      // restore selection
+      edgeVoiceSel.value = edgeVoiceId || '';
+      if (!edgeVoiceSel.value && edgeVoiceId) {
+        // if exact id not found, keep default
+        edgeVoiceId = '';
+        try { localStorage.removeItem('edgeVoiceId'); } catch {}
+      }
+    } catch (e) {
+      // keep old selection; the voice can still be typed via localStorage/default
+      if (captionsSel?.value === 'on') log('edge voices load failed:', String(e?.message || e));
+    }
+  }
+
   // Provider UI
   ttsProviderSel.value = ttsProvider;
-  edgeVoiceSel.value = edgeVoiceId;
+  await loadEdgeVoices();
 
   function syncProviderUi(){
     voiceLocalWrap.style.display = (ttsProviderSel.value === 'local') ? '' : 'none';
