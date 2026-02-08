@@ -62,10 +62,27 @@ function resolveWhisper(){
   return { exe, model };
 }
 
+function ensureWhisperInstalled(){
+  const { exe, model } = resolveWhisper();
+  if (fs.existsSync(exe) && fs.existsSync(model)) return;
+
+  console.log('[stt] whisper missing -> running setup_whisper.py');
+  const py = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const script = path.join(ROOT, 'setup_whisper.py');
+  if (!fs.existsSync(script)) throw new Error('setup_whisper.py missing');
+  const p = child_process.spawnSync(py, [script], { encoding: 'utf-8', maxBuffer: 20 * 1024 * 1024 });
+  if (p.status !== 0) {
+    throw new Error((p.stderr || p.stdout || '').trim() || `setup_whisper.py failed (${p.status})`);
+  }
+
+  // sanity
+  if (!fs.existsSync(exe)) throw new Error(`whisper-cli not found after setup: ${exe}`);
+  if (!fs.existsSync(model)) throw new Error(`whisper model not found after setup: ${model}`);
+}
+
 function runWhisperCli(wavBuf) {
   const { exe, model } = resolveWhisper();
-  if (!fs.existsSync(exe)) throw new Error(`whisper-cli not found: ${exe}`);
-  if (!fs.existsSync(model)) throw new Error(`whisper model not found: ${model}`);
+  if (!fs.existsSync(exe) || !fs.existsSync(model)) ensureWhisperInstalled();
 
   const tmpRoot = process.env.TEMP || process.env.TMP || (process.platform === 'win32' ? '.' : '/tmp');
   const tmpDir = fs.mkdtempSync(path.join(tmpRoot, 'openclaw-voice-'));
@@ -73,14 +90,15 @@ function runWhisperCli(wavBuf) {
   const outPrefix = path.join(tmpDir, 'out');
   fs.writeFileSync(wavPath, wavBuf);
 
-  // Reduce hallucinations like [MUSIC] by suppressing non-speech tokens and requiring clearer speech.
+  // Reduce hallucinations like [MUSIC] by suppressing non-speech tokens.
+  // Keep thresholds lenient enough so we don't drop the start of an utterance.
   const args = [
     '-m', model,
     '-l', 'de',
     '-nt',
     '-sns',
-    '--no-speech-thold', '0.80',
-    '--entropy-thold', '2.20',
+    '--no-speech-thold', '0.55',
+    '--entropy-thold', '2.80',
     '-of', outPrefix,
     '-otxt',
     wavPath,
@@ -282,15 +300,24 @@ class GatewayClient {
         if (p.state === 'delta') {
           const t = extractText(p.message);
           if (typeof t === 'string') w.buf = t;
+          if (typeof w.onDelta === 'function') {
+            try { w.onDelta(w.buf || ''); } catch {}
+          }
         }
         if (p.state === 'final') {
           const t = extractText(p.message);
           const finalText = typeof t === 'string' ? t : (w.buf || '');
           this.runWaiters.delete(runId);
+          if (typeof w.onFinal === 'function') {
+            try { w.onFinal(finalText); } catch {}
+          }
           w.resolve(finalText);
         }
         if (p.state === 'error') {
           this.runWaiters.delete(runId);
+          if (typeof w.onError === 'function') {
+            try { w.onError(p.errorMessage || 'chat error'); } catch {}
+          }
           w.reject(new Error(p.errorMessage || 'chat error'));
         }
       }
@@ -363,12 +390,18 @@ class GatewayClient {
   async chatSend(text) {
     if (!this.connected) throw new Error('not connected');
     const runId = crypto.randomUUID();
-    const waiter = {};
     const p = new Promise((resolve, reject) => {
-      this.runWaiters.set(runId, { resolve, reject, buf: '' });
+      this.runWaiters.set(runId, { resolve, reject, buf: '', onDelta: null, onFinal: null, onError: null });
     });
     await this.request('chat.send', { sessionKey: SESSION_KEY, message: text, deliver: false, idempotencyKey: runId });
     return { runId, promise: p };
+  }
+
+  async chatAbort(runId){
+    if (!this.connected) throw new Error('not connected');
+    if (!runId) throw new Error('runId required');
+    // Best-effort: OpenClaw gateway supports chat.abort on protocol v3.
+    return this.request('chat.abort', { sessionKey: SESSION_KEY, runId });
   }
 }
 
@@ -434,6 +467,83 @@ const server = http.createServer(async (req, res) => {
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 120000)),
       ]);
       return sendJson(res, 200, { text: reply });
+    }
+
+    // Streaming chat (SSE): emits {runId} first, then {text} deltas, then final.
+    if (req.method === 'POST' && u.pathname === '/api/chat/stream') {
+      const body = await readBody(req);
+      const j = JSON.parse(body.toString('utf-8'));
+      const text = String(j.text || '').trim();
+      if (!text) return sendJson(res, 400, { error: 'text required' });
+
+      const voicePrompt = [
+        'VOICE MODE:',
+        '- Answer ONLY the latest user input below.',
+        '- Ignore earlier topics unless the user explicitly brings them back up.',
+        '- Keep it short and direct.',
+        '- MAX: 2–3 sentences. No lists. No markdown formatting.',
+        '- If something essential is missing: ask exactly ONE clarification question.',
+        '',
+        'User input:',
+        text,
+      ].join('\n');
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+      });
+      res.write('retry: 1000\n\n');
+
+      const { runId, promise } = await gw.chatSend(voicePrompt);
+      const w = gw.runWaiters.get(runId);
+
+      const send = (obj) => {
+        try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch {}
+      };
+
+      send({ type: 'run', runId });
+
+      if (w) {
+        w.onDelta = (t) => send({ type: 'delta', text: t });
+        w.onFinal = (t) => send({ type: 'final', text: t });
+        w.onError = (m) => send({ type: 'error', error: m || 'error' });
+      }
+
+      // cleanup on client disconnect
+      req.on('close', () => {
+        try {
+          const ww = gw.runWaiters.get(runId);
+          if (ww) { ww.onDelta = null; ww.onFinal = null; ww.onError = null; }
+        } catch {}
+      });
+
+      // keep socket alive until finished (or timeout)
+      Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 120000)),
+      ]).then(() => {
+        send({ type: 'done' });
+        try { res.end(); } catch {}
+      }).catch((e) => {
+        send({ type: 'error', error: String(e?.message || e) });
+        try { res.end(); } catch {}
+      });
+
+      return;
+    }
+
+    if (req.method === 'POST' && u.pathname === '/api/chat/abort') {
+      const body = await readBody(req);
+      const j = JSON.parse(body.toString('utf-8'));
+      const runId = String(j.runId || '').trim();
+      if (!runId) return sendJson(res, 400, { error: 'runId required' });
+      try {
+        await gw.chatAbort(runId);
+      } catch (e) {
+        // best-effort; still return ok so UI can stop immediately
+      }
+      return sendJson(res, 200, { ok: true });
     }
 
     if (req.method === 'GET' && u.pathname === '/api/voices') {

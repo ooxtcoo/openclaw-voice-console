@@ -224,7 +224,7 @@
           <canvas id="c"></canvas>
         </div>
         <div class="controls" id="controls">
-          <button class="primary" id="btnPtt">Tap to talk</button>
+          <button class="primary" id="btnPtt">Hold to talk</button>
           <button id="btnAuto">Auto: OFF</button>
           <button class="danger" id="btnStop" disabled>Stop</button>
         </div>
@@ -236,12 +236,12 @@
           <div class="toggle">
             <span>TTS</span>
             <select id="ttsProvider">
-              <option value="local">Local</option>
+              <option value="local">Lokal</option>
               <option value="edge">Cloud</option>
             </select>
           </div>
           <div class="toggle" id="voiceLocalWrap">
-            <span>Voice</span>
+            <span>Stimme</span>
             <select id="voice"></select>
           </div>
           <div class="toggle" id="voiceEdgeWrap" style="display:none">
@@ -271,7 +271,7 @@
     </div>
 
     <div class="muted" style="margin-top:12px">
-      STT: local via whisper.cpp. TTS: local (Windows/SAPI5) or cloud (Edge Neural, no API key).
+      STT: local via whisper.cpp (de). TTS: local (Windows/SAPI5) or cloud (Edge Neural, no API key).
     </div>
   </div>
 
@@ -285,6 +285,21 @@
 
     <div class="sec">
       <h3>Face</h3>
+      <div>
+        <label>Head preset</label>
+        <select id="facePreset">
+          <option value="classic">Classic</option>
+          <option value="angular">Angular</option>
+          <option value="squarejaw">Square jaw</option>
+          <option value="narrow">Narrow</option>
+          <option value="maskFull">Mask (full head)</option>
+          <option value="maskFront">Mask (front)</option>
+        </select>
+      </div>
+      <div id="maskDetailWrap" style="display:none">
+        <label>Mask detail <span class="val" id="v_maskDetail"></span></label>
+        <input id="maskDetail" type="range" min="1" max="6" step="1" />
+      </div>
       <div>
         <label>Scale <span class="val" id="v_faceScale"></span></label>
         <input id="faceScale" type="range" min="0.6" max="2.2" step="0.01" />
@@ -303,12 +318,16 @@
       </div>
       <div>
         <label>Wireframe strength <span class="val" id="v_wireOpacity"></span></label>
-        <input id="wireOpacity" type="range" min="0.05" max="0.85" step="0.01" />
+        <input id="wireOpacity" type="range" min="0" max="0.85" step="0.01" />
       </div>
     </div>
 
     <div class="sec">
       <h3>Mouth</h3>
+      <div>
+        <label>Mouth Y <span class="val" id="v_mouthY"></span></label>
+        <input id="mouthY" type="range" min="-0.45" max="-0.05" step="0.01" />
+      </div>
       <div>
         <label>Mouth Width <span class="val" id="v_mouthWidth"></span></label>
         <input id="mouthWidth" type="range" min="0.10" max="0.40" step="0.01" />
@@ -325,6 +344,14 @@
 
     <div class="sec">
       <h3>Eyes</h3>
+      <div>
+        <label>Eye Y <span class="val" id="v_eyeY"></span></label>
+        <input id="eyeY" type="range" min="0.00" max="0.28" step="0.01" />
+      </div>
+      <div>
+        <label>Eye spacing <span class="val" id="v_eyeSpacing"></span></label>
+        <input id="eyeSpacing" type="range" min="0.18" max="0.44" step="0.01" />
+      </div>
       <div>
         <label>Eye Size <span class="val" id="v_eyeSize"></span></label>
         <input id="eyeSize" type="range" min="0.06" max="0.20" step="0.01" />
@@ -351,12 +378,12 @@
       <h3>System</h3>
       <div id="drawerSystem"></div>
       <div style="margin-top:10px">
-        <div class="muted" style="margin-bottom:8px">Debug</div>
+        <div class="muted" style="margin-bottom:8px">Debug output</div>
         <div class="log" id="log"></div>
       </div>
     </div>
   </div>
 
-<script type="module" src="app.js?v=20260208a"></script>
+<script type="module" src="app3d.js?v=20260208c"></script>
 </body>
 </html>
