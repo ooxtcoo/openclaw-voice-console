@@ -78,7 +78,7 @@ Notes:
 - In fullscreen, press **Space** to toggle push-to-talk
 
 ### Fullscreen / Kiosk
-- Button: **Vollbild**
+- Button: **Fullscreen**
 - Hotkeys:
   - **F** toggle fullscreen layout
   - **S** / **F1** toggle Settings drawer overlay

@@ -299,6 +299,8 @@ const pMat = new THREE.PointsMaterial({ size: 0.012, color: 0x60a5fa, transparen
 const particles = new THREE.Points(pGeo, pMat);
 scene.add(particles);
 
+// Resize canvas + renderer. Keep debug output OFF by default (it floods the console on some browsers).
+const DEBUG_RESIZE = false;
 function resize(){
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(2, Math.floor(rect.width));
@@ -309,8 +311,7 @@ function resize(){
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 
-  // Debug: confirm the backing buffer actually resized
-  if (captionsSel?.value === 'on') {
+  if (DEBUG_RESIZE) {
     log(`resize: css=${w}x${h} dpr=${dpr} canvas=${canvas.width}x${canvas.height}`);
   }
 

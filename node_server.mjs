@@ -418,13 +418,13 @@ const server = http.createServer(async (req, res) => {
       // Voice-mode guardrail: prevent the agent from continuing old context.
       const voicePrompt = [
         'VOICE MODE:',
-        '- Antworte NUR auf die letzte Nutzereingabe unten.',
-        '- Ignoriere vorherige Themen, es sei denn sie werden ausdrücklich erneut erwähnt.',
-        '- Antworte kurz und direkt auf Deutsch.',
-        '- MAX: 2–3 Sätze. Keine Listen, keine Markdown-Formatierung.',
-        '- Wenn etwas fehlt: stelle genau EINE Rückfrage.',
+        '- Answer ONLY the latest user input below.',
+        '- Ignore earlier topics unless the user explicitly brings them back up.',
+        '- Keep it short and direct.',
+        '- MAX: 2–3 sentences. No lists. No markdown formatting.',
+        '- If something essential is missing: ask exactly ONE clarification question.',
         '',
-        'Nutzereingabe:',
+        'User input:',
         text,
       ].join('\n');
 
@@ -450,8 +450,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && u.pathname === '/api/tts/providers') {
       const isWin = process.platform === 'win32';
       const providers = [
-        ...(isWin ? [{ id: 'local', name: 'Lokal (Windows/SAPI5)' }] : []),
-        { id: 'edge', name: 'Cloud (Edge Neural, ohne API-Key)' },
+        ...(isWin ? [{ id: 'local', name: 'Local (Windows/SAPI5)' }] : []),
+        { id: 'edge', name: 'Cloud (Edge Neural, no API key)' },
       ];
       return sendJson(res, 200, {
         providers,
