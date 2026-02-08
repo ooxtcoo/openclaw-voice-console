@@ -63,6 +63,9 @@ let winkUntilL = 0;
 let winkUntilR = 0;
 let nextBlinkAt = performance.now() + 2200 + Math.random()*2200;
 
+// Smooth mouth bias separately so expression changes don't look like a twitch.
+let mouthMoodBias = 0.0;
+
 let faceDemoTimer = null;
 function stopFaceDemo(){
   try { if (faceDemoTimer) clearInterval(faceDemoTimer); } catch {}
@@ -739,8 +742,10 @@ function animate(){
   const open = mouth * 0.18 * settings.mouthStrength;
 
   // mood -> smile offset (keep user slider as baseline)
-  // Stronger mapping so expressions read clearly even when idle.
-  const moodSmile = clamp(settings.mouthSmile + faceMood * 0.95, -1.2, 1.2);
+  // We treat this as a *bias* that should persist even while speaking.
+  // Smooth separately to avoid visible "twitch" when mood target jumps.
+  const moodSmileTarget = clamp(settings.mouthSmile + faceMood * 1.0, -1.25, 1.25);
+  mouthMoodBias = mouthMoodBias * 0.90 + moodSmileTarget * 0.10;
 
   const pts = mouthGeo.getAttribute('position');
   const n = pts.count - 1;
@@ -751,8 +756,9 @@ function animate(){
     // Keep geometry consistent with current settings (incl. smile) even after reload.
     const x = Math.cos(tArc) * settings.mouthWidth;
     const arc = Math.sin(tArc) * 0.03;
-    const corner = Math.pow(Math.abs(Math.cos(tArc)), 1.25);
-    const smile = moodSmile * 0.34 * corner;
+    // corner weight: closer to corners -> stronger bias
+    const corner = Math.pow(Math.abs(Math.cos(tArc)), 0.75);
+    const smile = mouthMoodBias * 0.40 * corner;
 
     const mouthY0 = Number(settings.mouthY ?? -0.22);
     const baseY = mouthY0 + arc + smile;
