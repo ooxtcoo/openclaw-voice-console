@@ -34,6 +34,13 @@ let mode = 'idle'; // idle | listening | thinking | speaking
 let autoMode = false;
 let stream;
 
+// Keep a continuous mic ring-buffer so Auto mode never misses the start of speech.
+// Stored as 16kHz Float32 chunks.
+let micRing = [];
+let micRingSec = 0;
+const MIC_RING_MAX_SEC = 8.0;
+let micRingProc = null;
+
 // --- Face mood (hybrid): deterministic base + optional assistant FACE: payload ---
 // mood: -1..+1 (sad/angry .. happy)
 let faceMood = 0.0;
@@ -799,6 +806,72 @@ let selectedVoiceName = localStorage.getItem('voiceName') || '';
 let ttsProvider = localStorage.getItem('ttsProvider') || 'local';
 let edgeVoiceId = localStorage.getItem('edgeVoiceId') || 'de-DE-KatjaNeural';
 
+function _downsampleTo16k(input, sourceRate){
+  const destRate = 16000;
+  const ratio = sourceRate / destRate;
+  const outLen = Math.floor(input.length / ratio);
+  const out = new Float32Array(outLen);
+  for (let i=0;i<outLen;i++){
+    const start = Math.floor(i * ratio);
+    const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+    let sum = 0;
+    let n = 0;
+    for (let j = start; j < end; j++) { sum += input[j]; n++; }
+    out[i] = n ? (sum / n) : input[start] || 0;
+  }
+  return out;
+}
+
+function _startMicRingBuffer(src){
+  if (micRingProc) return;
+  try {
+    micRing = [];
+    micRingSec = 0;
+
+    // Continuous tap. Keeps a rolling buffer even when we're "idle".
+    micRingProc = audioCtx.createScriptProcessor(2048, 1, 1);
+    micRingProc.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0);
+      const out = _downsampleTo16k(input, audioCtx.sampleRate);
+      micRing.push(out);
+      micRingSec += (out.length / 16000);
+
+      while (micRingSec > MIC_RING_MAX_SEC && micRing.length) {
+        const d = micRing.shift();
+        micRingSec -= (d.length / 16000);
+      }
+    };
+
+    src.connect(micRingProc);
+    micRingProc.connect(audioCtx.destination);
+  } catch {
+    micRingProc = null;
+  }
+}
+
+function _stopMicRingBuffer(){
+  try {
+    if (!micRingProc) return;
+    try { micRingProc.disconnect(); } catch {}
+  } catch {}
+  micRingProc = null;
+}
+
+function _getMicPreRollChunks(targetSec){
+  // Return the last targetSec from ring as array of Float32Array.
+  const sec = Math.max(0, Number(targetSec || 0));
+  if (!sec || !micRing.length) return [];
+  let need = sec;
+  const out = [];
+  for (let i = micRing.length - 1; i >= 0 && need > 0; i--) {
+    const c = micRing[i];
+    out.push(c);
+    need -= (c.length / 16000);
+  }
+  out.reverse();
+  return out;
+}
+
 async function ensureMic(){
   // If we already have a stream but user changed device, reacquire.
   if (stream && !selectedMicId) return stream;
@@ -807,6 +880,8 @@ async function ensureMic(){
     try { stream.getTracks().forEach(t => t.stop()); } catch {}
     stream = null;
   }
+
+  _stopMicRingBuffer();
 
   const constraints = selectedMicId
     ? { audio: { deviceId: { exact: selectedMicId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }
@@ -819,6 +894,10 @@ async function ensureMic(){
   micAnalyser = audioCtx.createAnalyser();
   micAnalyser.fftSize = 2048;
   src.connect(micAnalyser);
+
+  // Start continuous ring-buffer capture.
+  _startMicRingBuffer(src);
+
   return stream;
 }
 
@@ -894,11 +973,13 @@ async function recordOnce({maxMs=15000, vad=true}={}){
   // Smaller buffer reduces end-of-speech latency.
   const proc = audioCtx.createScriptProcessor(2048, 1, 1);
 
-  let recorded = [];
-  // keep a short pre-roll so we don't clip the start of speech
-  let preRoll = [];
-  let preRollSec = 0;
+  // Start with pre-roll from the continuous ring-buffer (so we also capture audio
+  // that happened BEFORE recordOnce() started).
   const PRE_ROLL_TARGET_SEC = 1.10;
+  let preRoll = _getMicPreRollChunks(PRE_ROLL_TARGET_SEC);
+  let preRollSec = preRoll.reduce((a,c)=>a+(c.length/destRate), 0);
+
+  let recorded = [];
 
   let rec = true;
   let startedAt = performance.now();
