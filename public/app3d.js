@@ -1358,6 +1358,7 @@ async function boot(){
     const dec = new TextDecoder('utf-8');
     let buf = '';
     let lastDeltaText = '';
+    let spokeFinal = false;
 
     while (true){
       let chunk;
@@ -1400,6 +1401,7 @@ async function boot(){
           lastDeltaText = evt.text;
           currentRunId = null;
           currentChatAbort = null;
+          spokeFinal = true;
           await speakAssistant(String(evt.text || ''));
         } else if (evt.type === 'error') {
           currentRunId = null;
@@ -1412,8 +1414,8 @@ async function boot(){
       }
     }
 
-    // If for some reason we ended without final, but we have text, speak it.
-    if (lastDeltaText && mode !== 'speaking') {
+    // If for some reason we ended without a final, but we have text, speak it once.
+    if (!spokeFinal && lastDeltaText && mode !== 'speaking') {
       await speakAssistant(String(lastDeltaText));
     }
   }
