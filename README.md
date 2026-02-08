@@ -75,6 +75,14 @@ Notes:
 
 ### Talk modes
 
+#### Face expressions (mood)
+The UI supports simple expression control via an optional suffix line in assistant output:
+
+- `FACE: {"mood": 0.7, "wink": "left"}`
+
+The voice console strips this line before TTS, but uses it to drive the face (smile/frown + wink/blink).
+
+
 **Auto mode (recommended)**
 - Click **Auto: ON/OFF**
 - Hotkey: **Space** toggles **Auto ON/OFF** (works in fullscreen/kiosk)
