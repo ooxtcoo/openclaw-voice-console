@@ -17,6 +17,7 @@ const btnPttDrawer = document.getElementById('btnPttDrawer');
 const btnAutoDrawer = document.getElementById('btnAutoDrawer');
 const btnStopDrawer = document.getElementById('btnStopDrawer');
 const btnDebugDrawer = document.getElementById('btnDebugDrawer');
+const btnFaceDemo = document.getElementById('btnFaceDemo');
 const micSel = document.getElementById('mic');
 const micEchoSel = document.getElementById('micEcho');
 const micNoiseSel = document.getElementById('micNoise');
@@ -61,6 +62,35 @@ let winkR = 0.0;
 let winkUntilL = 0;
 let winkUntilR = 0;
 let nextBlinkAt = performance.now() + 2200 + Math.random()*2200;
+
+let faceDemoTimer = null;
+function stopFaceDemo(){
+  try { if (faceDemoTimer) clearInterval(faceDemoTimer); } catch {}
+  faceDemoTimer = null;
+}
+function startFaceDemo(){
+  stopFaceDemo();
+  // Cycle through expressions deterministically (no LLM required)
+  const steps = [
+    { label: 'neutral', mood: 0.0, arousal: 0.2 },
+    { label: 'friendly', mood: 0.5, arousal: 0.35 },
+    { label: 'laugh', mood: 0.9, arousal: 0.6, wink: 'both' },
+    { label: 'sad', mood: -0.45, arousal: 0.15 },
+    { label: 'angry', mood: -0.85, arousal: 0.55, wink: 'right' },
+    { label: 'playful', mood: 0.35, arousal: 0.4, wink: 'left' },
+  ];
+  let i = 0;
+  const apply = () => {
+    const s = steps[i % steps.length];
+    faceMoodTarget = clamp(s.mood, -1, 1);
+    faceArousalTarget = clamp(s.arousal, 0, 1);
+    if (s.wink) triggerWink(String(s.wink), 180);
+    if (captionsSel?.value === 'on') log('FACE DEMO:', s.label);
+    i++;
+  };
+  apply();
+  faceDemoTimer = setInterval(apply, 1400);
+}
 
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
@@ -1721,9 +1751,17 @@ async function boot(){
     } catch {}
   });
 
+  btnFaceDemo?.addEventListener('click', () => {
+    // Toggle
+    if (faceDemoTimer) stopFaceDemo();
+    else startFaceDemo();
+    try { btnFaceDemo.textContent = faceDemoTimer ? 'Face demo: ON' : 'Face demo'; } catch {}
+  });
+
   async function doStop(){
     stopRequested = true;
     if (typeof stopRecordingNow === 'function') stopRecordingNow();
+    stopFaceDemo();
 
     // Stop should NOT disable Auto mode; Auto is controlled by its own toggle.
     // (Otherwise one stop-click ends auto after the first reply.)
