@@ -99,7 +99,7 @@ function runWhisperCli(wavBuf) {
     '-l', 'de',
     '-nt',
     '-sns',
-    '--no-speech-thold', '0.30',
+    '--no-speech-thold', '0.18',
     '--entropy-thold', '3.20',
   ];
 

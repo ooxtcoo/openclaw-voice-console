@@ -48,7 +48,7 @@ let stream;
 // Stored as 16kHz Float32 chunks.
 let micRing = [];
 let micRingSec = 0;
-const MIC_RING_MAX_SEC = 8.0;
+const MIC_RING_MAX_SEC = 12.0;
 let micRingProc = null;
 
 // --- Face mood (hybrid): deterministic base + optional assistant FACE: payload ---
@@ -1047,7 +1047,7 @@ async function recordOnce({maxMs=15000, vad=true}={}){
 
   // Start with pre-roll from the continuous ring-buffer (so we also capture audio
   // that happened BEFORE recordOnce() started).
-  const PRE_ROLL_TARGET_SEC = 1.10;
+  const PRE_ROLL_TARGET_SEC = 2.80;
   let preRoll = _getMicPreRollChunks(PRE_ROLL_TARGET_SEC);
   let preRollSec = preRoll.reduce((a,c)=>a+(c.length/destRate), 0);
 
@@ -1105,11 +1105,11 @@ async function recordOnce({maxMs=15000, vad=true}={}){
     const now = performance.now();
     // VAD tuning: avoid cutting off between words.
     // Start requires a firmer threshold; once speaking, allow lower energy to keep the turn alive.
-    const SPEECH_RMS_START = 0.010;
-    const SPEECH_RMS_CONTINUE = 0.007;
-    const NO_SPEECH_ABORT_MS = 1800;
-    const MIN_SPEECH_MS = 25;
-    const END_SILENCE_MS = 1900;
+    const SPEECH_RMS_START = 0.008;
+    const SPEECH_RMS_CONTINUE = 0.006;
+    const NO_SPEECH_ABORT_MS = 2200;
+    const MIN_SPEECH_MS = 10;
+    const END_SILENCE_MS = 2200;
 
     const gate = speech ? SPEECH_RMS_CONTINUE : SPEECH_RMS_START;
     if (rms > gate){
@@ -1922,7 +1922,7 @@ async function boot(){
   };
 }
 
-async function waitForVoice({threshold=0.035, minMs=180, pollMs=30}={}){
+async function waitForVoice({threshold=0.018, minMs=40, pollMs=25}={}){
   const started = performance.now();
   let aboveSince = 0;
   while (autoMode){
@@ -1953,7 +1953,7 @@ async function loopAuto(){
   while (autoMode){
     try {
       setMode('idle');
-      const heard = await waitForVoice({ threshold: 0.020, minMs: 80 });
+      const heard = await waitForVoice({ threshold: 0.012, minMs: 30 });
       if (!heard) break;
 
       setMode('listening');
