@@ -753,7 +753,7 @@ function animate(){
   // mood -> smile offset (keep user slider as baseline)
   // We treat this as a *bias* that should persist even while speaking.
   // Smooth separately to avoid visible "twitch" when mood target jumps.
-  const moodSmileTarget = clamp(settings.mouthSmile + faceMood * 1.0, -1.25, 1.25);
+  const moodSmileTarget = clamp(settings.mouthSmile + faceMood * 0.55, -1.0, 1.0);
   mouthMoodBias = mouthMoodBias * 0.96 + moodSmileTarget * 0.04;
 
   const pts = mouthGeo.getAttribute('position');
@@ -767,7 +767,7 @@ function animate(){
     const arc = Math.sin(tArc) * 0.03;
     // Apply bias mostly to corners (so we don't create a V-shape / center kink)
     const corner = Math.pow(Math.abs(Math.cos(tArc)), 3.5);
-    const smile = mouthMoodBias * 0.30 * corner;
+    const smile = mouthMoodBias * 0.22 * corner;
 
     const mouthY0 = Number(settings.mouthY ?? -0.22);
     const baseY = mouthY0 + arc + smile;
