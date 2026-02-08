@@ -30,6 +30,65 @@ let mode = 'idle'; // idle | listening | thinking | speaking
 let autoMode = false;
 let stream;
 
+// --- Face mood (hybrid): deterministic base + optional LLM FACE: payload ---
+// mood: -1..+1 (sad/angry .. happy)
+let faceMood = 0.0;
+let faceMoodTarget = 0.0;
+let faceArousal = 0.2;        // 0..1
+let faceArousalTarget = 0.2;
+let winkL = 0.0;              // 0..1 (1 = closed)
+let winkR = 0.0;
+let winkUntilL = 0;
+let winkUntilR = 0;
+let nextBlinkAt = performance.now() + 2200 + Math.random()*2200;
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+function triggerWink(side='left', ms=180){
+  const until = performance.now() + ms;
+  if (side === 'right') winkUntilR = Math.max(winkUntilR, until);
+  else if (side === 'both') { winkUntilL = Math.max(winkUntilL, until); winkUntilR = Math.max(winkUntilR, until); }
+  else winkUntilL = Math.max(winkUntilL, until);
+}
+
+// Parse optional FACE payload from assistant text, and return cleaned text.
+// Expected at end of message:  FACE: {"mood":0.2,"wink":"left"}
+function extractFacePayload(text){
+  if (typeof text !== 'string') return { text: String(text || '') };
+  const lines = text.split(/\r?\n/);
+  // find last non-empty line
+  let i = lines.length - 1;
+  while (i >= 0 && !String(lines[i]).trim()) i--;
+  if (i < 0) return { text };
+
+  const m = String(lines[i]).match(/^FACE\s*:\s*(\{[\s\S]*\})\s*$/);
+  if (!m) return { text };
+
+  let payload = null;
+  try { payload = JSON.parse(m[1]); } catch { payload = null; }
+  if (!payload || typeof payload !== 'object') return { text };
+
+  lines.splice(i, 1);
+  return { text: lines.join('\n').trim(), payload };
+}
+
+function applyFacePayload(payload){
+  if (!payload || typeof payload !== 'object') return;
+
+  if (typeof payload.mood === 'number' && Number.isFinite(payload.mood)) {
+    faceMoodTarget = clamp(payload.mood, -1, 1);
+  }
+  if (typeof payload.arousal === 'number' && Number.isFinite(payload.arousal)) {
+    faceArousalTarget = clamp(payload.arousal, 0, 1);
+  }
+  if (payload.wink) {
+    const w = String(payload.wink).toLowerCase();
+    if (w === 'left' || w === 'l') triggerWink('left');
+    else if (w === 'right' || w === 'r') triggerWink('right');
+    else if (w === 'both') triggerWink('both');
+  }
+}
+
 function log(...args){
   const s = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
   logEl.textContent = (logEl.textContent + (logEl.textContent ? '\n' : '') + s).slice(-8000);
@@ -383,9 +442,46 @@ function animate(){
     }
   }
 
+  // --- Face mood dynamics ---
+  // Base mood comes from mode; optional FACE: payload can override.
+  let baseMood = 0.0;
+  if (mode === 'speaking') baseMood = 0.25;
+  else if (mode === 'listening') baseMood = 0.10;
+  else if (mode === 'thinking') baseMood = -0.05;
+  faceMoodTarget = clamp(faceMoodTarget, -1, 1);
+  // If no external mood was set recently, slowly drift towards baseMood.
+  // (We still allow FACE payload to pull it around.)
+  faceMoodTarget = clamp(faceMoodTarget * 0.92 + baseMood * 0.08, -1, 1);
+
+  let baseArousal = 0.2;
+  if (mode === 'speaking') baseArousal = 0.7;
+  else if (mode === 'listening') baseArousal = 0.6;
+  else if (mode === 'thinking') baseArousal = 0.25;
+  faceArousalTarget = clamp(faceArousalTarget * 0.92 + baseArousal * 0.08, 0, 1);
+
+  // Smooth
+  faceMood = faceMood * 0.88 + faceMoodTarget * 0.12;
+  faceArousal = faceArousal * 0.85 + faceArousalTarget * 0.15;
+
+  // Idle blink + winks
+  const nowMs = performance.now();
+  if (nowMs > nextBlinkAt) {
+    triggerWink('both', 140);
+    nextBlinkAt = nowMs + 2600 + Math.random()*3400;
+  }
+  winkL = (nowMs < winkUntilL) ? 1.0 : winkL * 0.82;
+  winkR = (nowMs < winkUntilR) ? 1.0 : winkR * 0.82;
+
+  if (eyeL) eyeL.scale.y = 1.0 - 0.92 * clamp(winkL, 0, 1);
+  if (eyeR) eyeR.scale.y = 1.0 - 0.92 * clamp(winkR, 0, 1);
+
   // Mouth animation (line-based)
   const mouth = Math.max(0, Math.min(1, a * 5.0));
   const open = mouth * 0.18 * settings.mouthStrength;
+
+  // mood -> smile offset (keep user slider as baseline)
+  const moodSmile = clamp(settings.mouthSmile + faceMood * 0.42, -1, 1);
+
   const pts = mouthGeo.getAttribute('position');
   const n = pts.count - 1;
   for (let i=0;i<pts.count;i++){
@@ -396,7 +492,7 @@ function animate(){
     const x = Math.cos(tArc) * settings.mouthWidth;
     const arc = Math.sin(tArc) * 0.03;
     const corner = Math.pow(Math.abs(Math.cos(tArc)), 1.25);
-    const smile = settings.mouthSmile * 0.22 * corner;
+    const smile = moodSmile * 0.22 * corner;
 
     const baseY = -0.22 + arc + smile;
     const y = baseY - Math.sin(tArc) * open;
@@ -409,8 +505,11 @@ function animate(){
 
   particles.rotation.y = -t * 0.06;
 
-  // Color shift by mode
-  const c = (mode === 'speaking') ? 0xe0f2ff : (mode === 'listening') ? 0x93c5fd : 0x60a5fa;
+  // Color shift by mode + subtle mood tint
+  let c = (mode === 'speaking') ? 0xe0f2ff : (mode === 'listening') ? 0x93c5fd : 0x60a5fa;
+  // If mood is negative, shift slightly towards red; if positive, towards cyan.
+  if (faceMood < -0.15) c = 0xfca5a5;
+  else if (faceMood > 0.35) c = 0xa7f3d0;
   for (const m of faceMats) m.color.setHex(c);
 
   renderer.render(scene, camera);
@@ -792,6 +891,11 @@ async function boot(){
   setStatus(cfg.connected ? 'connected' : 'connecting…', cfg.connected ? 'ok' : 'neutral');
 
   async function speakAssistant(text){
+    // Optional FACE payload at the end of assistant message. Remove before TTS.
+    const ex = extractFacePayload(String(text || ''));
+    if (ex.payload) applyFacePayload(ex.payload);
+    text = ex.text;
+
     if (captionsSel.value === 'on') log('ASSISTANT:', text);
     mode = 'speaking';
     try {
@@ -816,8 +920,14 @@ async function boot(){
   }
 
   async function askOpenClaw(text){
+    mode = 'thinking';
     const res = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})}).then(r=>r.json());
-    if (res.error) throw new Error(res.error);
+    if (res.error) {
+      // small negative blip on errors
+      faceMoodTarget = clamp(faceMoodTarget - 0.35, -1, 1);
+      triggerWink('both', 120);
+      throw new Error(res.error);
+    }
     await speakAssistant(String(res.text || ''));
   }
 
