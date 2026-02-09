@@ -11,6 +11,9 @@ bin/
 **/*.wav
 **/*.mp3
 
+# Large demo videos (keep local; use external hosting or Git LFS if needed)
+**/*.mp4
+
 # Backup / build artifacts
 Backup/
 whisper.cpp-src/
