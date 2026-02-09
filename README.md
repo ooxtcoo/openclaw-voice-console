@@ -72,6 +72,11 @@ Notes:
 ![Screenshot 1](screenshots/screenshot_1.png)
 ![Screenshot 2](screenshots/screenshot_2.png)
 
+## Demo videos (YouTube Shorts)
+
+- https://youtube.com/shorts/WX5k8BCkBuE
+- https://youtube.com/shorts/vOMaJoGXdWQ
+
 ## Usage
 
 ### Talk modes
